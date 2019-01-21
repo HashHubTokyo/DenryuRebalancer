@@ -1,0 +1,2 @@
+module DenryuRebalancer.Models.LndInfo
+
