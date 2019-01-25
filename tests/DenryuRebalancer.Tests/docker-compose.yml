@@ -22,7 +22,7 @@ services:
       - "43782"
       - "39388"
     volumes:
-      - "bitcoind_dir/data"
+      - "./data/bitcoind_dir/data"
   lnd_for_balancer:
     restart: unless-stopped
     image: btcpayserver/lnd:v0.5.1-beta-2
@@ -31,8 +31,6 @@ services:
       LND_ENVIRONMENT: "regtest"
       LND_EXTRA_ARGS: |
         restlisten=0.0.0.0:8080
-        rpclisten=127.0.0.1:10008
-        rpclisten=0.0.0.0:10009
         bitcoin.node=bitcoind
         bitcoind.rpchost=bitcoind:43782
         bitcoind.rpcuser=0I5rfLbJEXsg
@@ -47,16 +45,14 @@ services:
         adminmacaroonpath=/data/admin.macaroon
         invoicemacaroonpath=/data/invoice.macaroon
         readonlymacaroonpath=/data/readonly.macaroon
-        noseedbackup=1
-        notls=1
     ports:
       - "32736:8080"
     expose:
       - "9735"
       - "8080"
     volumes:
-      - "lnd_for_balancer_dir:/data"
-      - "bitcoind_dir:/deps/.bitcoin"
+      - "./data/lnd_for_balancer_dir:/data"
+      - "./data/bitcoind_dir:/deps/.bitcoin"
     links:
       - bitcoind
   lnd_in_custody:
@@ -83,8 +79,8 @@ services:
     expose:
       - "9735"
     volumes:
-      - "lnd_in_custody_dir:/data"
-      - "bitcoind_dir:/deps/.bitcoin"
+      - "./data/lnd_in_custody_dir:/data"
+      - "./data/bitcoind_dir:/deps/.bitcoin"
     links:
       - bitcoind
   lnd_3rd_party:
@@ -111,8 +107,8 @@ services:
     expose:
       - "9735"
     volumes:
-      - "lnd_3rd_party_dir:/data"
-      - "bitcoind_dir:/deps/.bitcoin"
+      - "./data/lnd_3rd_party_dir:/data"
+      - "./data/bitcoind_dir:/deps/.bitcoin"
     links:
       - bitcoind
   redis:
@@ -121,11 +117,4 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
-
-volumes:
-    lnd_in_custody_dir:
-    lnd_for_balancer_dir:
-    lnd_3rd_party_dir:
-    redis_data:
-    bitcoind_dir:
+      - ./data/redis_data:/data
