@@ -76,11 +76,18 @@ let prepareNodes
 [<Fact>]
 let ``Should perform rebalancing properly`` () =
   let (btcClient, rebalancerClient, custodyClients, thirdParty) = getClients()
-  prepareNodes btcClient rebalancerClient custodyClients thirdParty |> Async.AwaitTask |> Async.RunSynchronously
+
+  // prepare channels for the first time.
   let nf = Nullable<bool>(false)
   let tf = Nullable<bool>(true)
-  let info = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf) |> Async.AwaitTask |> Async.RunSynchronously
-  Assert.NotEmpty(info.Channels)
+  let channel = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf) |> Async.AwaitTask |> Async.RunSynchronously
+  if channel.Channels = null then
+    prepareNodes btcClient rebalancerClient custodyClients thirdParty |> Async.AwaitTask |> Async.RunSynchronously
+    printf "preparing nodes ... "
+  let channel2 = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf) |> Async.AwaitTask |> Async.RunSynchronously
+  Assert.NotNull(channel2.Channels)
+  Assert.NotEmpty(channel2.Channels)
+
   let results = custodyClients
                 |> Seq.map(fun c -> RebalancingStrategy.extecuteRebalance rebalancerClient c)
                 |> Task.WhenAll
