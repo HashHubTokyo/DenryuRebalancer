@@ -75,7 +75,7 @@ services:
         bitcoind.rpcpass=yJt7h7D8JpQy
         trickledelay=1000
         externalip=lnd_in_custody:9735
-        no-macaroons=0
+        no-macaroons=1
         debuglevel=debug
         noseedbackup=1
     ports:
@@ -103,7 +103,7 @@ services:
         bitcoind.rpcpass=yJt7h7D8JpQy
         trickledelay=1000
         externalip=lnd_3rd_party:9735
-        no-macaroons=0
+        no-macaroons=1
         debuglevel=debug
         noseedbackup=1
     ports:
