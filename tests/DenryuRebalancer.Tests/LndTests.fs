@@ -9,11 +9,11 @@ open System.Threading.Tasks
 open BTCPayServer.Lightning.LND
 open BTCPayServer.Lightning
 open NBitcoin.RPC
-open BTCPayServer.Lightning
+
 
 let getCustodyClients (fac: ILightningClientFactory) : ILightningClient array =
   let clientsConfigs: LightningClientConfig seq = seq {
-    yield { name = "custody1"; ConnectionString = "type=lnd-rest;server=https://127.0.0.1:42802;allowinsecure=true" }
+    yield { name = "custody1"; ConnectionString = "type=lnd-rest;server=https://lnd:lnd@127.0.0.1:42802;allowinsecure=true" }
   }
   clientsConfigs |> Seq.toArray  |>  Array.map(fun s -> fac.Create(s.ConnectionString))
 
@@ -27,11 +27,11 @@ let getClients() =
 
   // for rebalancer
   let lnClientFactory = new LightningClientFactory(network)
-  let connectionString = "type=lnd-rest;server=https://127.0.0.1:32736;allowinsecure=true"
+  let connectionString = "type=lnd-rest;server=https://lnd:lnd@127.0.0.1:32736;allowinsecure=true"
   let rebalancerClient = lnClientFactory.Create(connectionString)
 
   // for virtual 3rd-party node
-  let thirdPartyClient = lnClientFactory.Create("type=lnd-rest;server=https://127.0.0.1:42804;allowinsecure=true")
+  let thirdPartyClient = lnClientFactory.Create("type=lnd-rest;server=https://lnd:lnd@127.0.0.1:42804;allowinsecure=true")
   (btcClient, rebalancerClient :?> LndClient, getCustodyClients lnClientFactory, thirdPartyClient) // get clients for custodies and return
 
 let generateOneBlockForClient (btc: RPCClient) (client: ILightningClient) =
@@ -46,7 +46,7 @@ let connect (thirdParty: NodeInfo) (client: ILightningClient) =
     let! _ = client.ConnectTo(thirdParty)
     let request = new OpenChannelRequest()
     request.NodeInfo <- thirdParty
-    request.ChannelAmount <- NBitcoin.Money.Coins(10m)
+    request.ChannelAmount <- NBitcoin.Money.Coins(0.01m)
     request.FeeRate <- new NBitcoin.FeeRate(0.0004m)
     let! _ = client.OpenChannel(request)
     return ()
@@ -74,7 +74,7 @@ let prepareNodes
 
 
 [<Fact>]
-let ``Should perform rebalancing properly`` =
+let ``Should perform rebalancing properly`` () =
   let (btcClient, rebalancerClient, custodyClients, thirdParty) = getClients()
   prepareNodes btcClient rebalancerClient custodyClients thirdParty |> Async.AwaitTask |> Async.RunSynchronously
   let nf = Nullable<bool>(false)
