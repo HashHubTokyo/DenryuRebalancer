@@ -2,16 +2,19 @@ module DenryuRebalancer.RebalancingStrategy
 open BTCPayServer.Lightning
 open BTCPayServer.Lightning.LND
 open FSharp.Control.Tasks
+open System.Threading.Tasks
 open NBitcoin
 
-type RebalanceOperationResult =
+type RebalanceOperationReturnValue =
   {
     NodeName: string
     Amount: int64
   }
 
+type RebalanceResult = Task<Result<RebalanceOperationReturnValue, string>>
+
 let extecuteRebalance (client: LndClient)
-                      (custodyClient: ILightningClient) =
+                      (custodyClient: ILightningClient): RebalanceResult =
   task {
-    return Ok { NodeName = "HogeClient"; Amount = Money.Coins(0.01m).Satoshi }
+    return Error "Failed to rebalance"
   }
