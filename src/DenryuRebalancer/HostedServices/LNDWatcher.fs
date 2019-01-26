@@ -33,7 +33,7 @@ type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILnd
       let! info = (client :> ILightningClient).GetInfo token |> Async.AwaitTask
       let! custodyInfos = custodyClients |> Seq.map(fun c -> c.GetInfo()) |> Seq.toArray |> Task.WhenAll |> Async.AwaitTask
       logRepo.setInfo info |> ignore
-      let! rebalanceResult =  custodyClients |> Seq.toArray |> Array.map(fun c -> extecuteRebalance client c) |> Task.WhenAll |> Async.AwaitTask
+      let! rebalanceResult =  custodyClients |> Seq.toArray |> Array.map(fun c -> extecuteRebalance client c token) |> Async.Parallel
       rebalanceResult |> Array.map(fun r -> postRebalanceExecution r) |> ignore
       return! loop client custodyClients token
     }

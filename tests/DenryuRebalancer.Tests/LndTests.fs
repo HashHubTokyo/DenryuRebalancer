@@ -10,6 +10,7 @@ open BTCPayServer.Lightning.LND
 open BTCPayServer.Lightning
 open NBitcoin.RPC
 open Confluent.Kafka
+open System.Threading
 
 
 let getCustodyClients (fac: ILightningClientFactory) : ILightningClient array =
@@ -93,8 +94,7 @@ let ``Should perform rebalancing properly`` () =
   Assert.NotEmpty(channel2.Channels)
 
   let results = custodyClients
-                |> Seq.map(fun c -> RebalancingStrategy.extecuteRebalance rebalancerClient c)
-                |> Task.WhenAll
-                |> Async.AwaitTask
+                |> Seq.map(fun c -> RebalancingStrategy.extecuteRebalance rebalancerClient c CancellationToken.None)
+                |> Async.Parallel
                 |> Async.RunSynchronously
   results |> Array.map(checkResult)
