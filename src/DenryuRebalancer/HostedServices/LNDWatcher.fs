@@ -1,5 +1,4 @@
 module DenryuRebalancer.HostedServices
-open System
 open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
@@ -8,34 +7,57 @@ open Microsoft.Extensions.Logging
 open BTCPayServer.Lightning
 open Microsoft.Extensions.Configuration
 open DenryuRebalancer.LndLogRepository
-open BTCPayServer.Lightning
-open BTCPayServer.Lightning
-open DenryuRebalancer.LightningClient
 open DenryuRebalancer.RebalancingStrategy
 open BTCPayServer.Lightning.LND
-open BTCPayServer.Lightning.LND
-open BTCPayServer.Lightning
+open DenryuRebalancer.Notifier
 
-type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILndLogRepository) =
+type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILndLogRepository, notifier: INotifier) =
   let getCustodyClients (fac: ILightningClientFactory) (conf: IConfigurationSection): ILightningClient array =
     let sections = conf.AsEnumerable()
     sections |> Seq.toArray |> Array.filter(fun s -> s.Key = "ConnectionString") |>  Array.map(fun s -> fac.Create(s.Value))
 
+  let maybeLog = function
+    | Some i -> sprintf "Rebalance performed in %s with amount %.2f satoshi" i.NodeName (i.Amount.ToDecimal(LightMoneyUnit.Satoshi)) |> logger.LogInformation
+    | None -> logger.LogInformation "Rebalance not performed since channel has enough amount"
+
   let postRebalanceExecution = function
-    | Ok i -> sprintf "Rebalance performed in %s with amount %d satoshi" i.NodeName i.Amount |> logger.LogInformation
+    | Ok r -> maybeLog r
     | Error e -> logger.LogError e
 
+  let mutable notified = false
+
+  let notify (info: LnrpcWalletBalanceResponse) =
+    notified <- true
+    async {
+      match! notifier.Notify(info.ToJson()) with
+        | false -> logger.LogError "Failed to notify with email! Please check your settings"
+        | true -> logger.LogWarning "Sent email to the admin mail address"
+    }
   // not using task since it does not support tail call optimization
-  let rec loop (client: LndClient) (custodyClients: ILightningClient seq) (token: CancellationToken) =  async {
+  let rec loop (client: LndClient)
+               (custodyClients: ILightningClient seq)
+               (rebalanceThreshold: LightMoney)
+               (notificationThreshold: LightMoney)
+               (token: CancellationToken) = 
+    async {
       if token.IsCancellationRequested then return ()
       logger.LogInformation "Performing loop ..."
-      do! Task.Delay(3000, token) |> Async.AwaitTask
+      do! Task.Delay(5000, token) |> Async.AwaitTask
+
+      // propagate information to the repository
       let! info = (client :> ILightningClient).GetInfo token |> Async.AwaitTask
-      let! custodyInfos = custodyClients |> Seq.map(fun c -> c.GetInfo()) |> Seq.toArray |> Task.WhenAll |> Async.AwaitTask
       logRepo.setInfo info |> ignore
-      let! rebalanceResult =  custodyClients |> Seq.toArray |> Array.map(fun c -> extecuteRebalance client c) |> Task.WhenAll |> Async.AwaitTask
+      let! balance = client.SwaggerClient.WalletBalanceAsync(token) |> Async.AwaitTask
+      logRepo.setBalance balance |> ignore
+      if not notified && (snd (LightMoney.TryParse(balance.Total_balance)) < notificationThreshold) then notify balance |> Async.Start
+
+      // check rebalancer 
+      let! prepareChannelResults = custodyClients |> Seq.map(fun c -> c.GetInfo()) |> Seq.toArray |> Task.WhenAll |> Async.AwaitTask
+
+      // execute rebalance
+      let! rebalanceResult =  custodyClients |> Seq.toArray |> Array.map(fun c -> extecuteRebalance client c rebalanceThreshold token Default) |> Async.Parallel
       rebalanceResult |> Array.map(fun r -> postRebalanceExecution r) |> ignore
-      return! loop client custodyClients token
+      return! loop client custodyClients notificationThreshold rebalanceThreshold token
     }
 
   interface IHostedService with
@@ -49,8 +71,10 @@ type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILnd
         // Setup client for rebalancer LND
         let lndconf = conf.GetSection("RebalanerLND")
         let connectionString = lndconf.GetValue<string>("ConnectionString", "type=lnd-rest;server=https://127.0.0.1:32736;allowinsecure=true")
+        let rebalanceThreshold = LightMoney.Satoshis(lndconf.GetValue<decimal>("RebalanceThreshold", 10000m))
         logger.LogInformation(sprintf "Connecting to LND by %s" connectionString)
         let client = lnClientFactory.Create(connectionString)
+        let notificationThreshold = LightMoney.Satoshis(lndconf.GetValue<decimal>("WalletBalanceNotificationThreshold", 100000m))
         let listener = client.Listen token
 
         // clients for custody
@@ -58,7 +82,7 @@ type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILnd
         let custodyClients = getCustodyClients lnClientFactory custodyConf
 
         // launch loop and return
-        do loop (client :?> LndClient) custodyClients token |> Async.StartAsTask |> ignore
+        do loop (client :?> LndClient) custodyClients rebalanceThreshold notificationThreshold token |> Async.StartAsTask |> ignore
         return Task.CompletedTask
       } :> Task
 
