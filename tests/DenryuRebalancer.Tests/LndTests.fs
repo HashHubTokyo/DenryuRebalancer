@@ -19,6 +19,8 @@ let getCustodyClients (fac: ILightningClientFactory) : ILightningClient array =
   }
   clientsConfigs |> Seq.toArray  |>  Array.map(fun s -> fac.Create(s.ConnectionString))
 
+let CHANNEL_AMOUNT_SATOSHI = 100000m
+
 let getClients() =
   let network = NBitcoin.Network.GetNetwork("regtest")
 
@@ -48,7 +50,7 @@ let connect (thirdParty: NodeInfo) (client: ILightningClient) =
     let! _ = client.ConnectTo(thirdParty)
     let request = new OpenChannelRequest()
     request.NodeInfo <- thirdParty
-    request.ChannelAmount <- NBitcoin.Money.Coins(0.01m)
+    request.ChannelAmount <- NBitcoin.Money.Satoshis(CHANNEL_AMOUNT_SATOSHI)
     request.FeeRate <- new NBitcoin.FeeRate(0.0004m)
     let! _ = client.OpenChannel(request)
     return ()
@@ -93,8 +95,14 @@ let ``Should perform rebalancing properly`` () =
   Assert.NotNull(channel2.Channels)
   Assert.NotEmpty(channel2.Channels)
 
+  let threshold = LightMoney.Satoshis(CHANNEL_AMOUNT_SATOSHI + 1m)
+
   let results = custodyClients
-                |> Seq.map(fun c -> RebalancingStrategy.extecuteRebalance rebalancerClient c CancellationToken.None)
+                |> Seq.map(fun c -> RebalancingStrategy.extecuteRebalance rebalancerClient c threshold CancellationToken.None RebalancingStrategy.Default)
                 |> Async.Parallel
                 |> Async.RunSynchronously
-  results |> Array.map(checkResult)
+  results |> Array.map(checkResult) |> ignore
+  let postRebalanceAmount = rebalancerClient.SwaggerClient.ChannelBalanceAsync() |> Async.AwaitTask |> Async.RunSynchronously
+  let a = snd (Decimal.TryParse(postRebalanceAmount.Balance))
+  Assert.True(a < CHANNEL_AMOUNT_SATOSHI, "Rebalance performed but the amount in rebalancer has not reduced!")
+  ()

@@ -6,6 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Models/LndInfo.fs" />
+    <Compile Include="Notifier/INotifier.fs" />
+    <Compile Include="Notifier/MailNotifier.fs" />
     <Compile Include="Serializers.fs" />
     <Compile Include="AppDbContext.fs" />
     <Compile Include="Repositories/LndLogRepository.fs" />

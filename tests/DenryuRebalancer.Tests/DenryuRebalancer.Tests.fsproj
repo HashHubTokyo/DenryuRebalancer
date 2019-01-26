@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="LightningGraphBuilderProgram.fs" />
     <Compile Include="LndTests.fs" />
     <Compile Include="Tests.fs" />
   </ItemGroup>

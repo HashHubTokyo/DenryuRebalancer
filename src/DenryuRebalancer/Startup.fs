@@ -21,6 +21,7 @@ open StackExchange.Redis
 open StackExchange.Redis
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Configuration
+open DenryuRebalancer.Notifier
 
 // ---------------------------------
 // Models
@@ -117,5 +118,6 @@ let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollectio
     services.AddGiraffe() |> ignore
     let con = getRedisConnectionMultiplexer ctx.Configuration
     services.AddSingleton<IConnectionMultiplexer>(con) |> ignore
-    services.AddSingleton<ILndLogRepository, LndLogRepository>() |> ignore
+    services.AddSingleton<INotifier, MailNotifier>() |> ignore
+    services.AddSingleton<ILndLogRepository, RedisLndLogRepository>() |> ignore
     services.AddSingleton<IHostedService, LNDWatcher>() |> ignore
