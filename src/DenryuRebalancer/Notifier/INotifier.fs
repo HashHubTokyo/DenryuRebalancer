@@ -1,4 +1,5 @@
 namespace DenryuRebalancer.Notifier
 
+type MailContent = { Subject: string; Content: string}
 type INotifier =
-  abstract member Notify : string -> Async<bool>
+  abstract member Notify : MailContent -> Async<unit>

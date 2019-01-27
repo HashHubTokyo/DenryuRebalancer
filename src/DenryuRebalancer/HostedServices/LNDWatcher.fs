@@ -29,9 +29,11 @@ type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILnd
   let notify (info: LnrpcWalletBalanceResponse) =
     notified <- true
     async {
-      match! notifier.Notify(info.ToJson()) with
-        | false -> logger.LogError "Failed to notify with email! Please check your settings"
-        | true -> logger.LogWarning "Sent email to the admin mail address"
+      try
+        do! notifier.Notify({ Subject = "Please send more funds to your DenryuRebalancer!"; Content = info.ToJson()})
+        logger.LogWarning "Sent email to the admin mail address"
+      with
+        | ex -> logger.LogError (sprintf "Failed to notify with email! Please check your settings \n %s" ex.Message)
     }
   // not using task since it does not support tail call optimization
   let rec loop (client: LndClient)
