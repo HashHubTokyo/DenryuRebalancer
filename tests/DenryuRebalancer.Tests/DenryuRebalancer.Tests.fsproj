@@ -18,5 +18,8 @@
   <ItemGroup>
     <Compile Include="LndTests.fs" />
     <Compile Include="Tests.fs" />
+    <None Include="appsettings.json" >
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

@@ -17,6 +17,7 @@ open Microsoft.Extensions.DependencyInjection
 let createHost() =
     WebHostBuilder()
         .UseContentRoot(Directory.GetCurrentDirectory())
+        .ConfigureAppConfiguration(DenryuRebalancer.Startup.configureAppConfiguration)
         .Configure(Action<IApplicationBuilder> DenryuRebalancer.Startup.configureApp)
         .ConfigureServices(Action<WebHostBuilderContext,IServiceCollection> DenryuRebalancer.Startup.configureServices)
 
