@@ -7,9 +7,7 @@ open DenryuRebalancer.LightningClient
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open System.Threading.Tasks
 open BTCPayServer.Lightning.LND
-open BTCPayServer.Lightning
 open NBitcoin.RPC
-open Confluent.Kafka
 open System.Threading
 
 
@@ -55,6 +53,10 @@ let connect (thirdParty: NodeInfo) (client: ILightningClient) =
     let! _ = client.OpenChannel(request)
     return ()
   }
+
+/// 1. generate one block per to the address for each LN node.
+/// 2. genereate 100 (for coinbase maturity)
+/// 3. connect "custody or rebalaner" -> "third party node" with 100000 satoshi
 let prepareNodes
   (bitcoinClient: RPCClient)
   (rebalancerClient: LndClient)
@@ -62,12 +64,18 @@ let prepareNodes
   (thirdPartyClient: ILightningClient) =
   task {
     // prepare funds
-    let! _ = generateOneBlockForClient bitcoinClient (rebalancerClient :> ILightningClient)
-    let! _ = custodyClients |> Seq.map(generateOneBlockForClient bitcoinClient) |> Task.WhenAll
+    let generator = generateOneBlockForClient bitcoinClient
+    let allClientsSeq = seq {
+        yield (rebalancerClient :> ILightningClient);
+        yield thirdPartyClient;
+        for c in custodyClients do yield c
+      }
+    let! _ = allClientsSeq |> Seq.map(generator) |> Task.WhenAll
     let! _ = bitcoinClient.GenerateAsync(100)
 
     // connect and broadcast funding tx
     let! info = thirdPartyClient.GetInfo()
+    printf "NodeInfo is %s" (info.NodeInfo.ToString())
     let! _ = connect info.NodeInfo (rebalancerClient :> ILightningClient)
     let! _ = custodyClients |> Seq.map(connect info.NodeInfo) |> Task.WhenAll
 
@@ -76,24 +84,37 @@ let prepareNodes
     return ()
   }
 
-let checkResult = function
+let checkResult (x: RebalancingStrategy.RebalanceResult) =
+  match x with
   | Ok i -> printf "OK!"
-  | Error e -> Assert.True(false, "Got Error from executeRebalance")
+  | Error e -> printf "Got Error from executeRebalance. \n %s \n" e; Assert.True(false)
 
-[<Fact>]
-let ``Should perform rebalancing properly`` () =
+let prepareNodesIfNecessary () =
   let (btcClient, rebalancerClient, custodyClients, thirdParty) = getClients()
-
   // prepare channels for the first time.
   let nf = Nullable<bool>(false)
   let tf = Nullable<bool>(true)
-  let channel = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf) |> Async.AwaitTask |> Async.RunSynchronously
-  if channel.Channels = null then
-    prepareNodes btcClient rebalancerClient custodyClients thirdParty |> Async.AwaitTask |> Async.RunSynchronously
-    printf "preparing nodes ... "
-  let channel2 = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf) |> Async.AwaitTask |> Async.RunSynchronously
-  Assert.NotNull(channel2.Channels)
-  Assert.NotEmpty(channel2.Channels)
+  task {
+    let! channel = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf)
+    if channel.Channels = null then
+      do! prepareNodes btcClient rebalancerClient custodyClients thirdParty
+      printf "preparing nodes ... "
+    let! channelFromRebalancer = rebalancerClient.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf)
+    Assert.NotNull(channelFromRebalancer.Channels)
+    Assert.NotEmpty(channelFromRebalancer.Channels)
+  }
+
+(*
+[<Fact>]
+let ``Should check route`` () =
+  prepareNodesIfNecessary()
+  RebalancingStrategy.checkRoute
+
+[<Fact>]
+let ``Should perform rebalancing properly`` () =
+  prepareNodesIfNecessary()
+  let (btcClient, rebalancerClient, custodyClients, thirdParty) = getClients()
+
 
   let threshold = LightMoney.Satoshis(CHANNEL_AMOUNT_SATOSHI + 1m)
 
@@ -106,3 +127,5 @@ let ``Should perform rebalancing properly`` () =
   let a = snd (Decimal.TryParse(postRebalanceAmount.Balance))
   Assert.True(a < CHANNEL_AMOUNT_SATOSHI, "Rebalance performed but the amount in rebalancer has not reduced!")
   ()
+
+*)

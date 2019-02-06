@@ -1,14 +1,8 @@
 module DenryuRebalancer.RebalancingStrategy
 open BTCPayServer.Lightning
 open BTCPayServer.Lightning.LND
-open FSharp.Control.Tasks
-open System.Threading.Tasks
-open NBitcoin
 open System.Threading
 open System
-open BTCPayServer.Lightning
-open BTCPayServer.Lightning
-open BTCPayServer.Lightning
 
 type RebalanceOperationReturnValue =
   {
@@ -24,6 +18,8 @@ let REBALANCE_UNIT_AMOUNT = LightMoney.Satoshis(50000m)
 
 
 type RouteStatus = HasActiveRoute | Pending | NoRouteToThirdPartyNode | NoRouteToCustodyNode
+
+
 let checkRoute (client: LndClient) (custodyClient: ILightningClient): Async<RouteStatus> =
   async { 
   // prepare channels for the first time.
@@ -76,6 +72,5 @@ let extecuteRebalance (client: LndClient)
                                        | Custom func -> return! (func client custodyClient)
           | NoRouteToCustodyNode -> return Error ("Rebalancer could not reach to the custody node by traversing the channels! please check if custody node has openned the correct channel.")
     with
-      | CustodyNotSupportedException msg -> return Error (sprintf "Failed to rebalance! %s" msg)
-      | _ -> return Error(sprintf "Failed to rebalance")
+    | CustodyNotSupportedException msg -> return Error (sprintf "Failed to rebalance! %s" msg)
   }
