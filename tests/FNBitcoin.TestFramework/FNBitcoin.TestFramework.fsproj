@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <DockerComposeProjectPath>../../docker-compose.dcproj</DockerComposeProjectPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Tests.fs" />
+    <Compile Include="LightningNodeLauncher.fs" />
+    <Compile Include="DockerComposeGenerator.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BTCPayServer.Lightning.All" Version="1.1.0.5" />
+    <PackageReference Include="BTCPayServer.Lightning.Common" Version="1.1.0.4" />
+    <PackageReference Include="BTCPayServer.Lightning.LND" Version="1.1.0.6" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
+    <PackageReference Include="xunit" Version="2.4.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
+    <PackageReference Include="NBitcoin" Version="4.1.1.81" />
+  </ItemGroup>
+
+</Project>

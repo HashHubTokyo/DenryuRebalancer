@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{4601739A
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DenryuRebalancer.Tests", "tests\DenryuRebalancer.Tests\DenryuRebalancer.Tests.fsproj", "{8AC7EFDD-539E-4B49-BCEF-BC430998DAC4}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FNBitcoin.TestFramework", "tests\FNBitcoin.TestFramework\FNBitcoin.TestFramework.fsproj", "{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,9 +50,22 @@ Global
 		{8AC7EFDD-539E-4B49-BCEF-BC430998DAC4}.Release|x64.Build.0 = Release|Any CPU
 		{8AC7EFDD-539E-4B49-BCEF-BC430998DAC4}.Release|x86.ActiveCfg = Release|Any CPU
 		{8AC7EFDD-539E-4B49-BCEF-BC430998DAC4}.Release|x86.Build.0 = Release|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Debug|x64.Build.0 = Debug|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Debug|x86.Build.0 = Debug|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Release|x64.ActiveCfg = Release|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Release|x64.Build.0 = Release|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Release|x86.ActiveCfg = Release|Any CPU
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B559D0C2-4B83-41FD-93D1-953226E59EA4} = {A198EC6F-AED4-4466-9931-5C5C5372D9CF}
 		{8AC7EFDD-539E-4B49-BCEF-BC430998DAC4} = {4601739A-013F-4C2D-8ED8-3651C327646F}
+		{2B785DC9-E42B-4A69-BEBB-A4FB68EEDCAA} = {4601739A-013F-4C2D-8ED8-3651C327646F}
 	EndGlobalSection
 EndGlobal

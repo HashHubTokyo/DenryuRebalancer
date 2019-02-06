@@ -29,7 +29,7 @@ let checkRoute (client: LndClient) (custodyClient: ILightningClient): Async<Rout
     return HasActiveRoute
   }
 
-let extecuteRebalanceCore (client: LndClient)
+let executeRebalanceCore (client: LndClient)
                           (custodyClient: ILightningClient)
                           (token: CancellationToken): Async<RebalanceResult> =
   async {
@@ -48,7 +48,7 @@ let defaultBehaviourWhenNoRoute (client: LndClient) (custody: ILightningClient) 
   async {
     return Ok (None)
   }
-let extecuteRebalance (client: LndClient)
+let executeRebalance (client: LndClient)
                       (custodyClient: ILightningClient)
                       (threshold: LightMoney)
                       (token: CancellationToken)
@@ -65,7 +65,7 @@ let extecuteRebalance (client: LndClient)
         return Ok None
       else
         match! checkRoute client custodyClient with
-          | HasActiveRoute -> return! extecuteRebalanceCore client custodyClient token
+          | HasActiveRoute -> return! executeRebalanceCore client custodyClient token
           | Pending -> return Ok None
           | NoRouteToThirdPartyNode -> match whenNoRoute with
                                        | Default -> return! defaultBehaviourWhenNoRoute client custodyClient
