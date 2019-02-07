@@ -1,0 +1,32 @@
+lnd_for_balancer:
+  restart: unless-stopped
+  image: btcpayserver/lnd:v0.5.1-beta-2
+  environment:
+    LND_CHAIN: "btc"
+    LND_ENVIRONMENT: "${LNLAUNCHER_NETWORK:-regtest}"
+    LND_EXTRA_ARGS: |
+      restlisten=0.0.0.0:8080
+      bitcoin.node=bitcoind
+      bitcoind.rpchost=bitcoind:${LNLAUNCHER_BITCOIND_RPCPORT}
+      bitcoind.rpcuser=0I5rfLbJEXsg
+      bitcoind.rpcpass=yJt7h7D8JpQy
+      bitcoind.zmqpubrawblock=tcp://bitcoind:28332
+      bitcoind.zmqpubrawtx=tcp://bitcoind:28333
+      trickledelay=1000
+      externalip=lnd_for_balancer:9735
+      no-macaroons=1
+      debuglevel=debug
+      noseedbackup=1
+      adminmacaroonpath=/data/admin.macaroon
+      invoicemacaroonpath=/data/invoice.macaroon
+      readonlymacaroonpath=/data/readonly.macaroon
+  ports:
+    - "${LNLAUNCHER_BALANCER_RESTPORT:?NoBalancerRESTPort}:8080"
+  expose:
+    - "9735"
+    - "8080"
+  volumes:
+    - "${LNLAUNCHER_DATADIR}/lnd_for_balancer_dir:/data"
+    - "${LNLAUNCHER_DATADIR}/bitcoind_dir:/deps/.bitcoin"
+  links:
+    - bitcoind

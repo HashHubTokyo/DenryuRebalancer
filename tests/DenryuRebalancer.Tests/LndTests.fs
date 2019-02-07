@@ -22,6 +22,7 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
       async {
         use builder = lnLauncher.createBuilder()
         builder.startNode()
+        let! _ = builder.ConnectAll()
         let clients = builder.GetClients()
 
         // case1: before opening channel

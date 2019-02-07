@@ -106,7 +106,14 @@ module LightningNodeLauncher =
             let p = Process.Start(startInfo)
             maybeRunningProcess <- Some p
             // printf "%s" (p.StandardError.ReadToEnd())
-            this.GetClients() |> checkConnected
+            let c = this.GetClients()
+            c |> checkConnected
+            // lnd requires at least one block in the chain. (otherwise it will return 500 when tried to connect)
+            c.Bitcoin.Generate(1) |> ignore
+            // end we must wait until lnd can scan that block.
+            Async.Sleep 1000 |> Async.RunSynchronously 
+            ()
+
 
         member this.GetClients(): Clients =
             let fac = new LightningClientFactory(network)
@@ -122,14 +129,21 @@ module LightningNodeLauncher =
                 ThirdParty = fac.Create(sprintf "type=lnd-rest;server=https://lnd:lnd@127.0.0.1:%d;allowinsecure=true" settings.THIRDPARTY_RESTPORT)
             }
 
-        member this.Connect(from: ILightningClient, dest: ILightningClient, [<Optional>] ?bothSide: bool) =
+        member this.Connect(from: ILightningClient, dest: ILightningClient) =
             async {
                 let! info = dest.GetInfo() |> Async.AwaitTask
                 let! _ = from.ConnectTo(info.NodeInfo) |> Async.AwaitTask
-                match bothSide with
-                | None -> ()
-                | Some b -> if b then return! this.Connect(dest, from, false) else ()
+                return ()
             }
+
+         member this.ConnectAll() =
+             let clients = this.GetClients()
+             [|
+                 this.Connect(clients.Rebalancer, clients.ThirdParty)
+                 this.Connect(clients.Rebalancer, clients.Custody)
+                 this.Connect(clients.Custody, clients.ThirdParty)
+             |] |> Async.Parallel
+
 
         member this.OpenChannel(from: ILightningClient, dest: ILightningClient, amount: Money) =
             async {
