@@ -8,7 +8,7 @@ else
   readonly SCRIPT_DIR_PATH=$(dirname $(readlink -f $0))
 fi
 
-custodyId=$./lncli-custody.sh getinfo | jq -r ".uris[0]")
+custodyId=$(./lncli-custody.sh getinfo | jq -r ".uris[0]")
 thirdPartyId=$(./lncli-3rdparty.sh getinfo | jq -r ".uris[0]")
 balancerId=$(./lncli-balancer.sh getinfo | jq -r ".uris[0]")
 ./lncli-balancer.sh connect $thirdPartyId
