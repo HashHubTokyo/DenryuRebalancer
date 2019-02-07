@@ -76,7 +76,7 @@ module LightningNodeLauncher =
             startInfo
 
         let rec checkConnected clients =
-            Task.Delay(1000) |> Async.AwaitTask |> Async.RunSynchronously
+            Task.Delay(2000) |> Async.AwaitTask |> Async.RunSynchronously
             try
                 Console.WriteLine("checking connection ...")
                 let _ = clients.Rebalancer.SwaggerClient.GetInfoAsync() |> Async.AwaitTask |> Async.RunSynchronously
@@ -85,13 +85,26 @@ module LightningNodeLauncher =
             | :? SocketException -> checkConnected clients
             | :? AggregateException -> checkConnected clients
 
+        let runDockerComposeDown() =
+            let startInfo = convertSettingsToEnvInStartInfo settings
+            startInfo.EnvironmentVariables.["COMPOSE_PROJECT_NAME"] <- name
+            startInfo.FileName <- "docker-compose"
+            startInfo.ArgumentList.Add("-f")
+            startInfo.ArgumentList.Add(composeFilePath)
+            startInfo.ArgumentList.Add("down")
+            let p = Process.Start(startInfo)
+            p.WaitForExit()
+            ()
+
         interface IDisposable with
             member this.Dispose() =
                 match maybeRunningProcess with
                 | None -> ()
                 | Some p ->
-                    p.Kill()
+                    runDockerComposeDown()
                     p.Dispose()
+                    maybeRunningProcess <- None
+                    printf "disposed Builder %s " name
 
         member this.startNode() =
             let startInfo = convertSettingsToEnvInStartInfo settings
@@ -100,9 +113,10 @@ module LightningNodeLauncher =
             startInfo.ArgumentList.Add("-f")
             startInfo.ArgumentList.Add(composeFilePath)
             startInfo.ArgumentList.Add("up")
+            // startInfo.ArgumentList.Add("-d")
             startInfo.ErrorDialog <- true
             startInfo.RedirectStandardError <- true
-            startInfo.RedirectStandardOutput <- false
+            startInfo.RedirectStandardOutput <- true
             let p = Process.Start(startInfo)
             maybeRunningProcess <- Some p
             // printf "%s" (p.StandardError.ReadToEnd())
@@ -158,7 +172,7 @@ module LightningNodeLauncher =
 
         member this.PrepareFunds(amount: Money, [<Optional>] ?confirmation: int, [<Optional>] ?onlyThisClient: ILightningClient) =
             let clients = this.GetClients()
-            let conf = defaultArg confirmation 5
+            let conf = defaultArg confirmation 3
             async {
                 let! _ = clients.Bitcoin.GenerateAsync(101) |> Async.AwaitTask
                 match onlyThisClient with
@@ -186,6 +200,9 @@ module LightningNodeLauncher =
                    | Some n -> n
                    | None -> Network.RegTest
          if not (Directory.Exists(name)) then
+            Directory.CreateDirectory(name) |> ignore
+         else 
+            Directory.Delete(name, true)
             Directory.CreateDirectory(name) |> ignore
          new LightningNodeBuilder(name, net, composeFilePath)
 
