@@ -11,5 +11,11 @@ After the application has started visit [http://localhost:5000](http://localhost
 
 ## testing application
 
-1. start external dependencies by `docker-compose up`
-2. run `./test.sh`
+Just run `./test.sh`
+
+Under the hood, it starts `docker-compose up` for each test case using compose file in `tests/FNBitcoin.TestFramework` .
+This is a great way to assure the independence of each test.
+
+But sometime, you may want more granular control about LN daemons and bitcoind.
+In that case, you can launch manually with `cd tests/DenryuRebalancer.Tests && docker-compose up`
+for tweeking docker-compose instance launched in this way, we prepared facade scripts under `docker-scripts`
