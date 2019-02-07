@@ -22,7 +22,7 @@ services:
       - "43782"
       - "39388"
     volumes:
-      - "./data/bitcoind_dir/data"
+      - "./data/bitcoind_dir:/home/bitcoin/.bitcoin"
   lnd_for_balancer:
     restart: unless-stopped
     image: btcpayserver/lnd:v0.5.1-beta-2
