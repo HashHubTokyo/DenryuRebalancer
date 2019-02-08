@@ -9,9 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Tests.fs" />
+    <Compile Include="TaskBuilder.fs" />
     <Compile Include="LightningNodeLauncher.fs" />
     <Compile Include="DockerComposeGenerator.fs" />
+    <Compile Include="Tests.fs" />
   </ItemGroup>
 
   <ItemGroup>

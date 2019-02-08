@@ -1,5 +1,6 @@
 namespace FNBitcoin.TestFramework
 
+open FSharp.Control.Tasks.V2.ContextInsensitive
 open System
 open System.IO
 open System.Net
@@ -139,51 +140,67 @@ module LightningNodeLauncher =
                 ThirdParty = fac.Create(sprintf "type=lnd-rest;server=https://lnd:lnd@127.0.0.1:%d;allowinsecure=true" settings.THIRDPARTY_RESTPORT)
             }
 
-        member this.Connect(from: ILightningClient, dest: ILightningClient) =
-            async {
-                let! info = dest.GetInfo() |> Async.AwaitTask
-                let! _ = from.ConnectTo(info.NodeInfo) |> Async.AwaitTask
+        member this.ConnectAsync(from: ILightningClient, dest: ILightningClient) =
+            task {
+                let! info = dest.GetInfo()
+                let! _ = from.ConnectTo(info.NodeInfo)
                 return ()
             }
 
-         member this.ConnectAll() =
+         member this.Connect(from: ILightningClient, dest: ILightningClient) =
+             this.ConnectAsync(from, dest).GetAwaiter().GetResult()
+
+         member this.ConnectAllAsync() =
              let clients = this.GetClients()
              [|
-                 this.Connect(clients.Rebalancer, clients.ThirdParty)
-                 this.Connect(clients.Rebalancer, clients.Custody)
-                 this.Connect(clients.Custody, clients.ThirdParty)
-             |] |> Async.Parallel
+                 this.ConnectAsync(clients.Rebalancer, clients.ThirdParty)
+                 this.ConnectAsync(clients.Rebalancer, clients.Custody)
+                 this.ConnectAsync(clients.Custody, clients.ThirdParty)
+             |] |> Task.WhenAll
+
+         member this.ConnectAll() =
+             this.ConnectAllAsync().GetAwaiter().GetResult()
 
 
-        member this.OpenChannel(from: ILightningClient, dest: ILightningClient, amount: Money) =
-            async {
-                let! info = dest.GetInfo() |> Async.AwaitTask
+        member this.OpenChannelAsync(from: ILightningClient, dest: ILightningClient, amount: Money) =
+            task {
+                let! info = dest.GetInfo()
                 let request = new OpenChannelRequest()
                 request.NodeInfo <- info.NodeInfo
                 request.ChannelAmount <- amount
                 request.FeeRate <- new NBitcoin.FeeRate(0.0004m)
-                let! _ = from.OpenChannel(request) |> Async.AwaitTask
+                let! _ = from.OpenChannel(request)
                 return ()
             }
 
-        member this.PrepareFunds(amount: Money, [<Optional>] ?confirmation: int, [<Optional>] ?onlyThisClient: ILightningClient) =
+        member this.OpenChannel(from: ILightningClient, dest: ILightningClient, amount: Money) =
+            this.OpenChannelAsync(from, dest, amount).GetAwaiter().GetResult()
+
+        member private this.PrepareFundsAsyncPrivate(amount: Money, confirmation: int option, onlyThisClient: ILightningClient option) =
             let clients = this.GetClients()
             let conf = defaultArg confirmation 3
-            async {
-                let! _ = clients.Bitcoin.GenerateAsync(101) |> Async.AwaitTask
+            task {
+                let! _ = clients.Bitcoin.GenerateAsync(101)
                 match onlyThisClient with
                 | Some c ->
-                    let! addr = c.GetDepositAddress() |> Async.AwaitTask
-                    let! _ = clients.Bitcoin.SendToAddressAsync(addr, amount) |> Async.AwaitTask
-                    return! clients.Bitcoin.GenerateAsync(conf) |> Async.AwaitTask
+                    let! addr = c.GetDepositAddress()
+                    let! _ = clients.Bitcoin.SendToAddressAsync(addr, amount)
+                    return! clients.Bitcoin.GenerateAsync(conf)
                 | None ->
-                    let! addr1 = clients.Custody.GetDepositAddress() |> Async.AwaitTask
-                    let! tmp = clients.Rebalancer.SwaggerClient.NewWitnessAddressAsync() |> Async.AwaitTask
+                    let! addr1 = clients.Custody.GetDepositAddress()
+                    let! tmp = clients.Rebalancer.SwaggerClient.NewWitnessAddressAsync()
                     let addr2 = NBitcoin.BitcoinAddress.Create(tmp.Address, network)
-                    let! addr3 = clients.ThirdParty.GetDepositAddress() |> Async.AwaitTask
-                    let! _ = [addr1; addr2; addr3] |> List.map(fun a -> clients.Bitcoin.SendToAddressAsync(a, amount)) |> Task.WhenAll |> Async.AwaitTask
-                    return! clients.Bitcoin.GenerateAsync(conf) |> Async.AwaitTask
+                    let! addr3 = clients.ThirdParty.GetDepositAddress()
+                    let! _ = [addr1; addr2; addr3] |> List.map(fun a -> clients.Bitcoin.SendToAddressAsync(a, amount)) |> Task.WhenAll
+                    return! clients.Bitcoin.GenerateAsync(conf)
             }
+
+        member this.PrepareFundsAsync(amount: Money, [<Optional>] ?confirmation: int, [<Optional>] ?onlyThisClient: ILightningClient) =
+            this.PrepareFundsAsyncPrivate(amount, confirmation, onlyThisClient)
+
+        member this.PrepareFunds(amount: Money, [<Optional>] ?confirmation: int, [<Optional>] ?onlyThisClient: ILightningClient) =
+            this.PrepareFundsAsyncPrivate(amount, confirmation, onlyThisClient)
+
 
     type LightningNodeLauncher() =
       let composeFilePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../../FNBitcoin.TestFramework/docker-compose.yml"))
