@@ -3,6 +3,8 @@ open BTCPayServer.Lightning
 open BTCPayServer.Lightning.LND
 open System.Threading
 open System
+open System.Collections.Generic
+open NBitcoin
 
 type RebalanceOperationReturnValue =
   {
@@ -14,20 +16,43 @@ type MaybeReblanceOperationReturn = RebalanceOperationReturnValue option
 type RebalanceResult = Result<MaybeReblanceOperationReturn, string>
 exception CustodyNotSupportedException of string
 
-let REBALANCE_UNIT_AMOUNT = LightMoney.Satoshis(50000m)
+let REBALANCE_UNIT_AMOUNT = 50_000
 
 
 type RouteStatus = HasActiveRoute | Pending | NoRouteToThirdPartyNode | NoRouteToCustodyNode
 
+let nullOrEmpty (x: ICollection<_>) =
+    x = null || x.Count = 0
 
-let checkRoute (client: LndClient) (custodyClient: ILightningClient): Async<RouteStatus> =
+let checkRoute (client: LndClient) (custodyId: PubKey) (thirdPartyId: PubKey option) (token: CancellationToken): Async<RouteStatus> =
   async { 
-  // prepare channels for the first time.
-    let nf = Nullable<bool>(false)
-    let tf = Nullable<bool>(true)
-    let! activeChannels = client.SwaggerClient.ListChannelsAsync(tf, nf, nf, nf) |> Async.AwaitTask
-    return HasActiveRoute
-  }
+
+    let! pendingC = client.SwaggerClient.PendingChannelsAsync() |> Async.AwaitTask
+    if pendingC.Pending_open_channels |> nullOrEmpty |> not then
+        return Pending
+    else 
+        try
+            let! _ = client.SwaggerClient.QueryRoutesAsync(custodyId.ToHex(), REBALANCE_UNIT_AMOUNT.ToString(), Nullable<int>()) |> Async.AwaitTask
+            return HasActiveRoute
+        with
+        | :? AggregateException ->
+            match thirdPartyId with
+            | None ->
+                 let nt = Nullable<bool>(true)
+                 let nf = Nullable<bool>(false)
+                 let! c = client.SwaggerClient.ListChannelsAsync(nt, nf, nf, nf) |> Async.AwaitTask
+                 if c.Channels |> nullOrEmpty then
+                     return NoRouteToThirdPartyNode
+                 else
+                     return NoRouteToCustodyNode
+            | Some i -> 
+                try
+                    let! _ = client.SwaggerClient.QueryRoutesAsync(i.ToHex(), REBALANCE_UNIT_AMOUNT.ToString(), Nullable<int>()) |> Async.AwaitTask
+                    return NoRouteToCustodyNode
+                with
+                | :? AggregateException ->
+                    return NoRouteToThirdPartyNode
+    }
 
 let executeRebalanceCore (client: LndClient)
                           (custodyClient: ILightningClient)
@@ -35,10 +60,10 @@ let executeRebalanceCore (client: LndClient)
   async {
     let invoiceid = new Guid()
     let invoiceIdStr = "rebalance-" + invoiceid.ToString()
-    let! invoice = custodyClient.CreateInvoice(REBALANCE_UNIT_AMOUNT, invoiceIdStr, TimeSpan.FromMinutes(5.0), token) |> Async.AwaitTask
+    let! invoice = custodyClient.CreateInvoice(LightMoney.op_Implicit(REBALANCE_UNIT_AMOUNT), invoiceIdStr, TimeSpan.FromMinutes(5.0), token) |> Async.AwaitTask
     let! result = (client :> ILightningClient).Pay(invoice.BOLT11, token) |> Async.AwaitTask
     match result.Result with
-      | PayResult.Ok -> return Ok(Some {NodeName = "node1"; Amount = REBALANCE_UNIT_AMOUNT})
+      | PayResult.Ok -> return Ok(Some {NodeName = "node1"; Amount = LightMoney.op_Implicit(REBALANCE_UNIT_AMOUNT)})
       | PayResult.CouldNotFindRoute -> return Error "Could not find route"
       | _ -> return Error "Unknown PayResult"
   }
@@ -64,7 +89,8 @@ let executeRebalance (client: LndClient)
       then
         return Ok None
       else
-        match! checkRoute client custodyClient with
+        let! custodyId = custodyClient.GetInfo() |> Async.AwaitTask
+        match! checkRoute client custodyId.NodeInfo.NodeId None token with
           | HasActiveRoute -> return! executeRebalanceCore client custodyClient token
           | Pending -> return Ok None
           | NoRouteToThirdPartyNode -> match whenNoRoute with

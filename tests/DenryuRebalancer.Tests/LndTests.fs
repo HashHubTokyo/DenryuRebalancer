@@ -25,40 +25,58 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
         let! _ = builder.ConnectAll()
         let clients = builder.GetClients()
 
+        let! custodyInfo = clients.Custody.GetInfo() |> Async.AwaitTask
+        let custodyId = custodyInfo.NodeInfo.NodeId
+
         // case1: before opening channel
         output.WriteLine("case 1")
-        match! checkRoute clients.Rebalancer clients.Custody with
+        match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
         | NoRouteToThirdPartyNode -> ()
         | other -> failwithf "%A" other
 
-        let! _ = builder.PrepareFunds(Money.Satoshis(200000m))
+        let! _ = builder.PrepareFunds(Money.Satoshis(200_000m))
 
         // case2: pending channel (rebalancer -> thirdParty)
-        output.WriteLine("case 1")
-        let! _ = builder.OpenChannel(clients.Rebalancer, clients.ThirdParty, Money.Satoshis(50000m))
-        match! checkRoute clients.Rebalancer clients.Custody with
+        output.WriteLine("case 2")
+        let! _ = builder.OpenChannel(clients.Rebalancer, clients.ThirdParty, Money.Satoshis(80_000m))
+        match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
         | Pending -> ()
         | other -> failwithf "%A" other
 
         // case3: after confirmation (rebalancer -> thirdParty)
         output.WriteLine("case 3")
-        let! _ = clients.Bitcoin.GenerateAsync(5) |> Async.AwaitTask
-        match! checkRoute clients.Rebalancer clients.Custody with
+        clients.Bitcoin.Generate(6) |> ignore
+        do! Async.Sleep(500) // Unfortunately we must wait lnd to sync...
+        match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
         | NoRouteToCustodyNode -> ()
         | other -> failwithf "%A" other
 
         // case4: after opening pending channel (custody -> thirdParty)
         output.WriteLine("case 4")
-        let! _ = builder.OpenChannel(clients.Custody, clients.ThirdParty, Money.Satoshis(50000m))
-        match! checkRoute clients.Rebalancer clients.Custody with
-        | Pending -> ()
+        let! _ = builder.OpenChannel(clients.Custody, clients.ThirdParty, Money.Satoshis(80_000m))
+        match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
+        | NoRouteToCustodyNode -> ()
         | other -> failwithf "%A" other
 
-        // case5: after opening while channels
+        // case5: after opening whole channels (but custody can not receive yet)
         output.WriteLine("case 5")
-        let! _ = clients.Bitcoin.GenerateAsync(5) |> Async.AwaitTask
-        match! checkRoute clients.Rebalancer clients.Custody with
-        | HasActiveRoute-> ()
+        clients.Bitcoin.Generate(5) |> ignore
+        do! Async.Sleep(500)
+        match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
+        | NoRouteToCustodyNode -> ()
+        | other -> failwithf "%A" other
+
+        // case6: Success case
+        output.WriteLine("case 6")
+        let! invoice = clients.ThirdParty.CreateInvoice(LightMoney.op_Implicit(REBALANCE_UNIT_AMOUNT + 1000), "RouteCheckTest", TimeSpan.FromMinutes(5.0), new CancellationToken()) |> Async.AwaitTask
+        use! listener = clients.ThirdParty.Listen() |> Async.AwaitTask
+        let waitTask = listener.WaitInvoice(new CancellationToken())
+        let! _ = clients.Custody.Pay(invoice.BOLT11) |> Async.AwaitTask
+        let! paidInvoice = waitTask |> Async.AwaitTask
+        Assert.True(paidInvoice.PaidAt.HasValue)
+        output.WriteLine("checking rout")
+        match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
+        | HasActiveRoute -> ()
         | other -> failwithf "%A" other
 
       } |> Async.RunSynchronously
