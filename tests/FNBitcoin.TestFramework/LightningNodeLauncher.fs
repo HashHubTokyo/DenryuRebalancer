@@ -89,9 +89,7 @@ module LightningNodeLauncher =
             let startInfo = convertSettingsToEnvInStartInfo settings
             startInfo.EnvironmentVariables.["COMPOSE_PROJECT_NAME"] <- name
             startInfo.FileName <- "docker-compose"
-            startInfo.ArgumentList.Add("-f")
-            startInfo.ArgumentList.Add(composeFilePath)
-            startInfo.ArgumentList.Add("down")
+            startInfo.Arguments <- " -f " + composeFilePath + " down"
             let p = Process.Start(startInfo)
             p.WaitForExit()
             ()
@@ -110,9 +108,7 @@ module LightningNodeLauncher =
             let startInfo = convertSettingsToEnvInStartInfo settings
             startInfo.EnvironmentVariables.["COMPOSE_PROJECT_NAME"] <- name
             startInfo.FileName <- "docker-compose"
-            startInfo.ArgumentList.Add("-f")
-            startInfo.ArgumentList.Add(composeFilePath)
-            startInfo.ArgumentList.Add("up")
+            startInfo.Arguments <- " -f " + composeFilePath + " up"
             // startInfo.ArgumentList.Add("-d")
             startInfo.ErrorDialog <- true
             startInfo.RedirectStandardError <- true
