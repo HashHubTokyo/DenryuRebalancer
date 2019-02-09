@@ -6,7 +6,7 @@ open BTCPayServer.Lightning
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open Xunit
 open Xunit.Abstractions
-open FNBitcoin.TestFramework
+open LNTestFramework.LightningNodeLauncher
 open System.Threading
 open System.Threading.Tasks
 open NBitcoin
@@ -78,11 +78,10 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
         Assert.True(paidInvoice.PaidAt.HasValue)
         output.WriteLine("checking rout")
         match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
-        | HasActiveRoute -> ()
+        | HasActiveRoute route -> Assert.Equal(1, route.Count)
         | other -> failwithf "%A" other
 
       }
-
 
     (*
     [<Fact>]

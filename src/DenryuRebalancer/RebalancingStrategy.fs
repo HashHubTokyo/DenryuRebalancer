@@ -1,7 +1,9 @@
 module DenryuRebalancer.RebalancingStrategy
-open BTCPayServer.Lightning
+open FSharp.Control.Tasks.V2.ContextInsensitive
 open BTCPayServer.Lightning.LND
 open System.Threading
+open System.Threading.Tasks
+open BTCPayServer.Lightning
 open System
 open System.Collections.Generic
 open NBitcoin
@@ -19,21 +21,21 @@ exception CustodyNotSupportedException of string
 let REBALANCE_UNIT_AMOUNT = 50_000
 
 
-type RouteStatus = HasActiveRoute | Pending | NoRouteToThirdPartyNode | NoRouteToCustodyNode
+type RouteStatus = HasActiveRoute of ICollection<LnrpcRoute> | Pending | NoRouteToThirdPartyNode | NoRouteToCustodyNode
 
 let nullOrEmpty (x: ICollection<_>) =
     x = null || x.Count = 0
 
-let checkRoute (client: LndClient) (custodyId: PubKey) (thirdPartyId: PubKey option) (token: CancellationToken): Async<RouteStatus> =
-  async { 
+let checkRoute (client: LndClient) (custodyId: PubKey) (thirdPartyId: PubKey option) (token: CancellationToken): Task<RouteStatus> =
+  task { 
 
     let! pendingC = client.SwaggerClient.PendingChannelsAsync() |> Async.AwaitTask
     if pendingC.Pending_open_channels |> nullOrEmpty |> not then
         return Pending
     else 
         try
-            let! _ = client.SwaggerClient.QueryRoutesAsync(custodyId.ToHex(), REBALANCE_UNIT_AMOUNT.ToString(), Nullable<int>()) |> Async.AwaitTask
-            return HasActiveRoute
+            let! route = client.SwaggerClient.QueryRoutesAsync(custodyId.ToHex(), REBALANCE_UNIT_AMOUNT.ToString(), Nullable<int>()) |> Async.AwaitTask
+            return HasActiveRoute route.Routes
         with
         | :? AggregateException ->
             match thirdPartyId with
@@ -77,8 +79,8 @@ let executeRebalance (client: LndClient)
                       (custodyClient: ILightningClient)
                       (threshold: LightMoney)
                       (token: CancellationToken)
-                      (whenNoRoute: WhenNoRouteBehaviour): Async<RebalanceResult> =
-  async {
+                      (whenNoRoute: WhenNoRouteBehaviour): Task<RebalanceResult> =
+  task {
     try
       let custodyLndClient = match custodyClient with
                              | :? LndClient as l -> l
@@ -91,7 +93,7 @@ let executeRebalance (client: LndClient)
       else
         let! custodyId = custodyClient.GetInfo() |> Async.AwaitTask
         match! checkRoute client custodyId.NodeInfo.NodeId None token with
-          | HasActiveRoute -> return! executeRebalanceCore client custodyClient token
+          | HasActiveRoute route -> return! executeRebalanceCore client custodyClient token
           | Pending -> return Ok None
           | NoRouteToThirdPartyNode -> match whenNoRoute with
                                        | Default -> return! defaultBehaviourWhenNoRoute client custodyClient
