@@ -2,3 +2,4 @@ bin
 obj
 .vs/
 tests/DenryuRebalancer.Tests/data
+help

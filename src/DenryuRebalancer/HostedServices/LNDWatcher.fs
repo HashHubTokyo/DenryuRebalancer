@@ -57,7 +57,7 @@ type LNDWatcher(logger: ILogger<LNDWatcher>, conf: IConfiguration, logRepo: ILnd
       let! prepareChannelResults = custodyClients |> Seq.map(fun c -> c.GetInfo()) |> Seq.toArray |> Task.WhenAll |> Async.AwaitTask
 
       // execute rebalance
-      let! rebalanceResult =  custodyClients |> Seq.toArray |> Array.map(fun c -> extecuteRebalance client c rebalanceThreshold token Default) |> Async.Parallel
+      let! rebalanceResult =  custodyClients |> Seq.toArray |> Array.map(fun c -> executeRebalance client c rebalanceThreshold token Default) |> Task.WhenAll |> Async.AwaitTask
       rebalanceResult |> Array.map(fun r -> postRebalanceExecution r) |> ignore
       return! loop client custodyClients notificationThreshold rebalanceThreshold token
     }
