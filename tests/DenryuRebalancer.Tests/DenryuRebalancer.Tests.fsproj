@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LNTestFramework" Version="1.0.12" />
+    <PackageReference Include="LNTestFramework" Version="1.0.13" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.*" />
     <PackageReference Include="Microsoft.AspNetCore.App" Version="2.2.*" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.2.*" />

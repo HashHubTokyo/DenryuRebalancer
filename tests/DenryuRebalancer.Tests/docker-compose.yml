@@ -42,9 +42,6 @@ services:
         no-macaroons=1
         debuglevel=debug
         noseedbackup=1
-        adminmacaroonpath=/data/admin.macaroon
-        invoicemacaroonpath=/data/invoice.macaroon
-        readonlymacaroonpath=/data/readonly.macaroon
     ports:
       - "32736:8080"
     expose:
