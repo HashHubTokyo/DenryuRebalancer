@@ -81,22 +81,27 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
 
       }
 
-    (*
     [<Fact>]
     let ``Should perform rebalancing properly`` () =
-      async {
+      task {
         use builder = lnLauncher.createBuilder()
         builder.startNode()
-        let! _ = builder.PrepareFunds(Money.Satoshis(200000m))
-        let threshold = LightMoney.Satoshis(200000m + 1m)
+        builder.ConnectAll() |> ignore
+        let! _ = builder.PrepareFunds(Money.Satoshis(200_000m))
         let clients = builder.GetClients()
+        let channelFunds = Money.Satoshis(200000m)
+        builder.OpenChannel(clients.Bitcoin, clients.Rebalancer, clients.ThirdParty, channelFunds)
+        let threshold = LightMoney.Satoshis(200000m + 1m)
+
+        // perform rebalance
         let! result = executeRebalance clients.Rebalancer clients.Custody threshold CancellationToken.None RebalancingStrategy.Default
         checkResult result
 
         let! postRebalanceAmount = clients.Rebalancer.SwaggerClient.ChannelBalanceAsync()
-        let a = snd (Decimal.TryParse(postRebalanceAmount.Balance))
-        Assert.True(a < CHANNEL_AMOUNT_SATOSHI, "Rebalance performed but the amount in rebalancer has not reduced!")
-        ()
-      } |> Async.AwaitTask |> Async.RunSynchronously
+        let a = match Decimal.TryParse(postRebalanceAmount.Balance) with
+                | true, d -> Money.Satoshis(d)
+                | false, _ -> failwithf "failed to parse result of ChannelBalanceAsync %s" postRebalanceAmount.Balance
 
-      *)
+        Assert.True(a < channelFunds, "Rebalance performed but the amount in rebalancer has not reduced!")
+        ()
+      }

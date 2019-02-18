@@ -93,13 +93,15 @@ let executeRebalance (client: LndClient)
       let custodyLndClient = match custodyClient with
                              | :? LndClient as l -> l
                              | _ -> raise (CustodyNotSupportedException "The rebalancer currently only supports lnd for its custody!")
-      let! channelInfo = custodyLndClient.SwaggerClient.ChannelBalanceAsync(token) |> Async.AwaitTask
-      let balance = LightMoney.Parse(channelInfo.Balance)
+      let! channelInfo = custodyLndClient.SwaggerClient.ChannelBalanceAsync(token)
+      let balance = match LightMoney.TryParse(channelInfo.Balance) with
+                    | true, m -> m
+                    | false, e -> failwithf "failed to parse channelInfo. input was %s" channelInfo.Balance
       if (not (balance < threshold))
       then
         return Ok None
       else
-        let! custodyId = custodyClient.GetInfo() |> Async.AwaitTask
+        let! custodyId = custodyClient.GetInfo()
         match! checkRoute client custodyId.NodeInfo.NodeId None token with
           | HasActiveRoute route -> return! executeRebalanceCore client custodyClient token
           | Pending -> return Ok None
