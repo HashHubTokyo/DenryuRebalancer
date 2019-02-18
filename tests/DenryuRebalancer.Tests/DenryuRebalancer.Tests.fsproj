@@ -7,8 +7,6 @@
   <ItemGroup>
     <PackageReference Include="LNTestFramework" Version="1.0.13" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.*" />
-    <PackageReference Include="Microsoft.AspNetCore.App" Version="2.2.*" />
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.2.*" />
     <PackageReference Include="xunit" Version="2.4.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.*" />
   </ItemGroup>
@@ -18,11 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="LndTests.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="Program.fs" />
-    <None Include="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>
