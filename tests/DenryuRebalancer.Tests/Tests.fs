@@ -14,8 +14,8 @@ open NBitcoin
 
 let checkResult (x: RebalancingStrategy.RebalanceResult) =
   match x with
-  | Ok i -> printf "OK!"
-  | Error e -> printf "Got Error from executeRebalance. \n %s \n" e; Assert.True(false)
+  | Ok i -> printfn "OK! %A" i
+  | Error e -> printfn "Got Error from executeRebalance. \n %s \n" e; Assert.True(false)
 
 
 type LndWatcherTestCase(output: ITestOutputHelper) =
@@ -81,22 +81,34 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
 
       }
 
-    (*
+    let getBalanceInChannel (client: ILightningClient) =
+        async {
+            let! channels = client.ListChannels() |> Async.AwaitTask
+            return channels |> Array.map(fun c -> c.LocalBalance) |> Array.reduce(+)
+        }
+
     [<Fact>]
     let ``Should perform rebalancing properly`` () =
       async {
         use builder = lnLauncher.createBuilder()
         builder.startNode()
-        let! _ = builder.PrepareFunds(Money.Satoshis(200000m))
-        let threshold = LightMoney.Satoshis(200000m + 1m)
+        // builder.ConnectAll() |> ignore
+        let! _ = builder.PrepareFunds(Money.Satoshis(200_000_0m)) |> Async.AwaitTask
         let clients = builder.GetClients()
-        let! result = executeRebalance clients.Rebalancer clients.Custody threshold CancellationToken.None RebalancingStrategy.Default
+        let channelFunds = 200000m
+        builder.OpenChannel(clients.Bitcoin, clients.Rebalancer, clients.ThirdParty, Money.Satoshis(channelFunds))
+        builder.OpenChannel(clients.Bitcoin, clients.ThirdParty, clients.Custody, Money.Satoshis(channelFunds))
+
+        let rebalancer = (clients.Rebalancer :> ILightningClient)
+        let! preRebalanceAmount = rebalancer |> getBalanceInChannel
+
+        // perform rebalance
+        let! result = executeRebalanceCore clients.Rebalancer clients.Custody CancellationToken.None
         checkResult result
 
-        let! postRebalanceAmount = clients.Rebalancer.SwaggerClient.ChannelBalanceAsync()
-        let a = snd (Decimal.TryParse(postRebalanceAmount.Balance))
-        Assert.True(a < CHANNEL_AMOUNT_SATOSHI, "Rebalance performed but the amount in rebalancer has not reduced!")
-        ()
-      } |> Async.AwaitTask |> Async.RunSynchronously
+        let! postRebalanceAmount = rebalancer |> getBalanceInChannel
 
-      *)
+        Assert.True(postRebalanceAmount < preRebalanceAmount,
+                    sprintf "Rebalance performed but the amount in rebalancer has not reduced! %s" (postRebalanceAmount.ToString()))
+        ()
+      }
