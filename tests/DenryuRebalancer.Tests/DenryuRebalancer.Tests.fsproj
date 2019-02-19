@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LNTestFramework" Version="1.0.13" />
+    <PackageReference Include="LNTestFramework" Version="1.0.16" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.*" />
     <PackageReference Include="xunit" Version="2.4.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.*" />

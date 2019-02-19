@@ -18,6 +18,17 @@ let checkResult (x: RebalancingStrategy.RebalanceResult) =
   | Error e -> printfn "Got Error from executeRebalance. \n %s \n" e; Assert.True(false)
 
 
+let pay (from: ILightningClient, dest: ILightningClient, amountMilliSatoshi: LightMoney) =
+    task {
+        let! invoice = dest.CreateInvoice(amountMilliSatoshi, "RouteCheckTest", TimeSpan.FromMinutes(5.0), new CancellationToken())
+        use! listener = dest.Listen()
+        let waitTask = listener.WaitInvoice(new CancellationToken())
+        let! _ = from.Pay(invoice.BOLT11)
+        let! paidInvoice = waitTask
+        Assert.True(paidInvoice.PaidAt.HasValue)
+        return ()
+    }
+
 type LndWatcherTestCase(output: ITestOutputHelper) =
     [<Fact>]
     let ``Should check route`` () =
@@ -36,7 +47,8 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
         | NoRouteToThirdPartyNode -> ()
         | other -> failwithf "%A" other
 
-        let! _ = builder.PrepareFunds(Money.Satoshis(200_000m))
+        do! builder.PrepareBTCFundsAsync()
+        let! _ = builder.PrepareLNFundsAsync(Money.Satoshis(1_000_000m))
 
         // case2: pending channel (rebalancer -> thirdParty)
         output.WriteLine("case 2")
@@ -69,12 +81,7 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
 
         // case5: Success case
         output.WriteLine("case 5")
-        let! invoice = clients.ThirdParty.CreateInvoice(LightMoney.op_Implicit((1000 + 50000) * 1000), "RouteCheckTest", TimeSpan.FromMinutes(5.0), new CancellationToken())
-        use! listener = clients.ThirdParty.Listen()
-        let waitTask = listener.WaitInvoice(new CancellationToken())
-        let! _ = clients.Custody.Pay(invoice.BOLT11)
-        let! paidInvoice = waitTask
-        Assert.True(paidInvoice.PaidAt.HasValue)
+        do! pay(clients.Custody, clients.ThirdParty, LightMoney.op_Implicit((1000+ 50000) * 1000))
         match! checkRoute clients.Rebalancer custodyId None CancellationToken.None with
         | HasActiveRoute r -> Assert.NotEmpty(r)
         | other -> failwithf "%A" other
@@ -93,22 +100,46 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
         use builder = lnLauncher.createBuilder()
         builder.startNode()
         // builder.ConnectAll() |> ignore
-        let! _ = builder.PrepareFunds(Money.Satoshis(200_000_0m)) |> Async.AwaitTask
+        do! builder.PrepareBTCFundsAsync() |> Async.AwaitTask
         let clients = builder.GetClients()
-        let channelFunds = 200000m
+        let channelFunds = 200_000m
+        let! _ =  builder.PrepareLNFundsAsync(Money.Satoshis(1_000_000m)) |> Async.AwaitTask
         builder.OpenChannel(clients.Bitcoin, clients.Rebalancer, clients.ThirdParty, Money.Satoshis(channelFunds))
         builder.OpenChannel(clients.Bitcoin, clients.ThirdParty, clients.Custody, Money.Satoshis(channelFunds))
 
+        do! builder.Pay(clients.ThirdParty, clients.Custody, LightMoney.op_Implicit((50000) * 1000))
+
         let rebalancer = (clients.Rebalancer :> ILightningClient)
         let! preRebalanceAmount = rebalancer |> getBalanceInChannel
+        let! preRebalanceAmountCustody = clients.Custody |> getBalanceInChannel
 
-        // perform rebalance
+        // 1. perform rebalance
         let! result = executeRebalanceCore clients.Rebalancer clients.Custody CancellationToken.None
         checkResult result
 
-        let! postRebalanceAmount = rebalancer |> getBalanceInChannel
+        let! postRebalanceAmount1 = rebalancer |> getBalanceInChannel
+        let! postRebalanceAmountCustody1 = clients.Custody |> getBalanceInChannel
 
-        Assert.True(postRebalanceAmount < preRebalanceAmount,
-                    sprintf "Rebalance performed but the amount in rebalancer has not reduced! %s" (postRebalanceAmount.ToString()))
+        Assert.True(postRebalanceAmount1 < preRebalanceAmount,
+                    sprintf "Rebalance performed but the amount in rebalancer has not reduced! %s" (postRebalanceAmount1.ToString()))
+        Assert.True(preRebalanceAmountCustody < postRebalanceAmountCustody1,
+                    sprintf "Rebalance performed but the amount in custody has not increased! %s" (postRebalanceAmountCustody1.ToString()))
+
+        // 2. Assert it won't perform rebalancing when it has more amount than threshold
+        let threshold = LightMoney.Satoshis(200m)
+        let! result = executeRebalance clients.Rebalancer clients.Custody threshold CancellationToken.None WhenNoRouteBehaviour.Default
+        checkResult result
+        let! postRebalanceAmountShouldNotChange = rebalancer |> getBalanceInChannel
+        Assert.Equal(postRebalanceAmount1, postRebalanceAmountShouldNotChange)
+
+        // 3. Assert it will perform rebalance correctly when the amount is less than threshold
+        let threshold = LightMoney.Satoshis(2_000_000m)
+        let! result = executeRebalance clients.Rebalancer clients.Custody threshold CancellationToken.None WhenNoRouteBehaviour.Default
+        checkResult result
+
+        let! postRebalanceAmount2 = rebalancer |> getBalanceInChannel
+
+        Assert.True(postRebalanceAmount2 < postRebalanceAmount1,
+                    sprintf "Rebalance performed but the amount in rebalancer has not reduced! %s" (postRebalanceAmount2.ToString()))
         ()
       }
