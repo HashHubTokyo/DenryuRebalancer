@@ -87,28 +87,26 @@ let executeRebalance (client: LndClient)
                       (custodyClient: ILightningClient)
                       (threshold: LightMoney)
                       (token: CancellationToken)
-                      (whenNoRoute: WhenNoRouteBehaviour): Task<RebalanceResult> =
-  task {
+                      (whenNoRoute: WhenNoRouteBehaviour): Async<RebalanceResult> =
+  async {
     try
-      let custodyLndClient = match custodyClient with
-                             | :? LndClient as l -> l
-                             | _ -> raise (CustodyNotSupportedException "The rebalancer currently only supports lnd for its custody!")
-      let! channelInfo = custodyLndClient.SwaggerClient.ChannelBalanceAsync(token)
-      let balance = match LightMoney.TryParse(channelInfo.Balance) with
-                    | true, m -> m
-                    | false, e -> failwithf "failed to parse channelInfo. input was %s" channelInfo.Balance
-      if (not (balance < threshold))
-      then
-        return Ok None
+      let! channels = custodyClient.ListChannels(token) |> Async.AwaitTask
+      if channels.Length = 0 then
+        return Error "Has No Active Route"
       else
-        let! custodyId = custodyClient.GetInfo()
-        match! checkRoute client custodyId.NodeInfo.NodeId None token with
-          | HasActiveRoute route -> return! executeRebalanceCore client custodyClient token
-          | Pending -> return Ok None
-          | NoRouteToThirdPartyNode -> match whenNoRoute with
-                                       | Default -> return! defaultBehaviourWhenNoRoute client custodyClient
-                                       | Custom func -> return! (func client custodyClient)
-          | NoRouteToCustodyNode -> return Error ("Rebalancer could not reach to the custody node by traversing the channels! please check if custody node has openned the correct channel.")
+          let balance = channels |> Array.map(fun a -> a.LocalBalance) |> Array.reduce(+)
+          if (not (balance < threshold))
+          then
+            return Ok None
+          else
+            let! custodyId = custodyClient.GetInfo() |> Async.AwaitTask
+            match! checkRoute client custodyId.NodeInfo.NodeId None token |> Async.AwaitTask with
+              | HasActiveRoute route -> return! executeRebalanceCore client custodyClient token
+              | Pending -> return Ok None
+              | NoRouteToThirdPartyNode -> match whenNoRoute with
+                                           | Default -> return! defaultBehaviourWhenNoRoute client custodyClient
+                                           | Custom func -> return! (func client custodyClient)
+              | NoRouteToCustodyNode -> return Error ("Rebalancer could not reach to the custody node by traversing the channels! please check if custody node has openned the correct channel.")
     with
     | CustodyNotSupportedException msg -> return Error (sprintf "Failed to rebalance! %s" msg)
   }
