@@ -125,7 +125,14 @@ type LndWatcherTestCase(output: ITestOutputHelper) =
         Assert.True(preRebalanceAmountCustody < postRebalanceAmountCustody1,
                     sprintf "Rebalance performed but the amount in custody has not increased! %s" (postRebalanceAmountCustody1.ToString()))
 
-        // 2. check rebalance threshold and perform rebalance
+        // 2. Assert it won't perform rebalancing when it has more amount than threshold
+        let threshold = LightMoney.Satoshis(200m)
+        let! result = executeRebalance clients.Rebalancer clients.Custody threshold CancellationToken.None WhenNoRouteBehaviour.Default
+        checkResult result
+        let! postRebalanceAmountShouldNotChange = rebalancer |> getBalanceInChannel
+        Assert.Equal(postRebalanceAmount1, postRebalanceAmountShouldNotChange)
+
+        // 3. Assert it will perform rebalance correctly when the amount is less than threshold
         let threshold = LightMoney.Satoshis(2_000_000m)
         let! result = executeRebalance clients.Rebalancer clients.Custody threshold CancellationToken.None WhenNoRouteBehaviour.Default
         checkResult result
