@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 readonly VERSION="1.0"
 if [[ "$(uname)" == 'Darwin' ]]; then
