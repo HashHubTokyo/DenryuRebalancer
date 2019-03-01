@@ -11,6 +11,21 @@ pool:
 
 steps:
 
+- task: SonarSource.sonarqube.15B84CA1-B62F-4A2A-A403-89B77A063157.SonarQubePrepare@4
+  displayName: 'Prepare analysis on SonarQube'
+  inputs:
+    SonarQube: sonarqube.f6fd523bd4f040399d3c.westus2.aksapp.io
+    scannerMode: CLI
+    configMode: manual
+    cliProjectKey: 'tokyo.hashhub.denryu.rebalancer'
+    cliProjectName: 'Denryu Rebalancer'
+    cliProjectVersion: 0.0.0
+    cliSources: src
+    extraProperties: |
+     # Additional properties that will be passed to the scanner, 
+     # Put one key=value per line, example:
+     # sonar.exclusions=**/*.bin
+
 - task: DockerCompose@0
   inputs:
     action: 'run Services'
@@ -21,3 +36,10 @@ steps:
 - script: './test.sh'
 
 - script: './test-integration.sh'
+
+- task: SonarSource.sonarqube.6D01813A-9589-4B15-8491-8164AEB38055.SonarQubeAnalyze@4
+  displayName: 'Run Code Analysis'
+
+steps:
+- task: SonarSource.sonarqube.291ed61f-1ee4-45d3-b1b0-bf822d9095ef.SonarQubePublish@4
+  displayName: 'Publish Quality Gate Result'
