@@ -119,5 +119,6 @@ volumes:
   redis_data:
   lnd_3rd_party_dir:
   bitcoind_dir:
+  lnd_for_balancer_dir:
   lnd_in_custody_dir:
   lnd_in_balancer_dir:
