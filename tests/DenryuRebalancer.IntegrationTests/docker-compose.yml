@@ -22,7 +22,7 @@ services:
       - "43782"
       - "39388"
     volumes:
-      - "./data/bitcoind_dir:/home/bitcoin/.bitcoin"
+      - "bitcoind_dir:/home/bitcoin/.bitcoin"
   lnd_for_balancer:
     restart: unless-stopped
     image: btcpayserver/lnd:v0.5.1-beta-2
@@ -48,8 +48,8 @@ services:
       - "9735"
       - "8080"
     volumes:
-      - "./data/lnd_for_balancer_dir:/data"
-      - "./data/bitcoind_dir:/deps/.bitcoin"
+      - "lnd_for_balancer_dir:/data"
+      - "bitcoind_dir:/deps/.bitcoin"
     links:
       - bitcoind
   lnd_in_custody:
@@ -76,8 +76,8 @@ services:
     expose:
       - "9735"
     volumes:
-      - "./data/lnd_in_custody_dir:/data"
-      - "./data/bitcoind_dir:/deps/.bitcoin"
+      - "lnd_in_custody_dir:/data"
+      - "bitcoind_dir:/deps/.bitcoin"
     links:
       - bitcoind
   lnd_3rd_party:
@@ -104,8 +104,8 @@ services:
     expose:
       - "9735"
     volumes:
-      - "./data/lnd_3rd_party_dir:/data"
-      - "./data/bitcoind_dir:/deps/.bitcoin"
+      - "lnd_3rd_party_dir:/data"
+      - "bitcoind_dir:/deps/.bitcoin"
     links:
       - bitcoind
   redis:
@@ -114,4 +114,11 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - ./data/redis_data:/data
+      - redis_data:/data
+volumes:
+  redis_data:
+  lnd_3rd_party_dir:
+  bitcoind_dir:
+  lnd_for_balancer_dir:
+  lnd_in_custody_dir:
+  lnd_in_balancer_dir:
