@@ -26,10 +26,10 @@ steps:
      # Put one key=value per line, example:
      # sonar.exclusions=**/*.bin
 
-- task: DockerCompose@0
-  inputs:
-    action: 'run Services'
-    dockerComposeFile: tests/DenryuRebalancer.IntegrationTests/docker-compose-ci.yml
+#- task: DockerCompose@0
+#  inputs:
+#    action: 'run Services'
+#    dockerComposeFile: tests/DenryuRebalancer.IntegrationTests/docker-compose-ci.yml
 
 - script: './build.sh'
   displayName: 'Bulid'
