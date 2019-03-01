@@ -34,10 +34,10 @@ steps:
 - script: './build.sh'
   displayName: 'Bulid'
 
-- script: './test.sh'
+- script: 'LNLAUNCHER_DATADIR=/tmp ./test.sh'
   displayName: 'Unit tests'
 
-- script: './test-integration.sh'
+- script: 'LNLAUNCHER_DATADIR=/tmp ./test-integration.sh'
   displayName: 'Integration tests'
 
 - task: SonarSource.sonarqube.6D01813A-9589-4B15-8491-8164AEB38055.SonarQubeAnalyze@4
