@@ -25,6 +25,7 @@ steps:
      # Additional properties that will be passed to the scanner, 
      # Put one key=value per line, example:
      # sonar.exclusions=**/*.bin
+     sonar.exclusions=bitcoind_dir/**
 
 - task: DockerCompose@0
   inputs:
@@ -32,10 +33,13 @@ steps:
     dockerComposeFile: tests/DenryuRebalancer.IntegrationTests/docker-compose.yml
 
 - script: './build.sh'
+  displayName: 'Bulid'
 
 - script: './test.sh'
+  displayName: 'Unit tests'
 
 - script: './test-integration.sh'
+  displayName: 'Integration tests'
 
 - task: SonarSource.sonarqube.6D01813A-9589-4B15-8491-8164AEB38055.SonarQubeAnalyze@4
   displayName: 'Run Code Analysis'
